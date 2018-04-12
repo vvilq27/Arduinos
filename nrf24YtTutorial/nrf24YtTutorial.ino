@@ -2,14 +2,17 @@
 #include <RF24.h>
 #include <SPI.h> 
 
+#define SAMPLE_RATE 24000
 
 int adcPin = A0;
 int adcValue = 0;
 //volatile int ledToggle = 0;
-volatile byte tabIncr = 0;
+volatile byte buffIndex = 0;
 volatile int packPerSec = 0;
 volatile int lastPcktCnt = 0;
 volatile byte buffEmpty = 0;
+volatile byte volume = 4;
+byte bytH;
 int lastPckNum = 0;
 int talkButton = 3;
 int ledPin = 10;
@@ -47,7 +50,6 @@ void timer1Audio(void){
  ==========================*/
 void setup()
 {
-  populateBuffer(0);
   timer1Audio();
   
   Serial.begin(115200);
@@ -58,7 +60,9 @@ void setup()
   myRadio.setDataRate( RF24_250KBPS ) ; 
   myRadio.openWritingPipe( addresses[0]);
   delay(100);
+  sei();
 
+/*
   TCCR1A = 0;
   TCCR1B = 0;
   
@@ -68,9 +72,10 @@ void setup()
   TIMSK1 |= (1 << TOIE1);   // enable timer overflow interrupt
 
   interrupts();             // enable all interrupts
-
+*/
   pinMode(ledPin,OUTPUT);
   pinMode(talkButton, INPUT);
+  
   attachInterrupt(digitalPinToInterrupt(talkButton), talk, CHANGE);
 }
 
@@ -110,7 +115,7 @@ void talk()
       myRadio.write(&data, sizeof(data));
       */
 //      buffer[0] = buffer[0] + 1;
-      populateBuffer(tabIncr++);
+//      populateBuffer(buffIndex++);
       myRadio.writeFast(&buffer, 32);
     }
   }else {
@@ -120,10 +125,7 @@ void talk()
 
 ISR(TIMER1_OVF_vect)        // interrupt service routine
 {
-  packPerSec = data.id - lastPcktCnt;
-  lastPcktCnt = data.id;
-  
-  TCNT1 = 34286 + 34286/2;
+
 }
 
 //voice data sending
@@ -131,13 +133,17 @@ ISR(TIMER1_COMPA_vect){                                         // This interrup
    if(buffEmpty == 0){                             // If a buffer is ready to be sent                               // Get the buffer # before allowing nested interrupts
       TIMSK1 &= ~(_BV(OCIE1A));                      // Disable this interrupt vector
       sei();                                         // Allow other interrupts to interrupt this vector (nested interrupts)
-      //radi.startFastWrite(&buffer[a],32);
-      radi.writeFast(&buffer,32);
-      buffEmpty = 1;                              // Mark the buffer as empty
+      myRadio.writeFast(&buffer,32);
       TIMSK1 |= _BV(OCIE1A);                           // Re-enable this interrupt vector
    }
 }
-//ISR(TIMER1_COMPB_vect){
-//
-//  
-//}
+
+//voice data acqusition
+ISR(TIMER1_COMPB_vect){                                            // This interrupt vector captures the ADC values and stores them in a buffer
+  if(buffEmpty == 1)
+    buffer[buffIndex++] = ADCH;                    // Read the high byte of the ADC register into the buffer for 8-bit samples         
+  else{
+    
+  }
+//    OCR1A = bytH << volume;
+}

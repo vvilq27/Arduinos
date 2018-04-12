@@ -129,11 +129,7 @@ ISR(TIMER1_OVF_vect)        // interrupt service routine
 
 //  WK TK part
 
-  OCR1A = OCR1B = (buffer[audioPcktCnt] << 8);
-  audioPcktCnt++;
 
-  if(audioPcktCnt > 32)
-    audioPcktCnt = 0;
 }
 
 
