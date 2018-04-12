@@ -7,18 +7,23 @@ byte addresses[][6] = {"253"};
 
 struct Audio{
   int id = 0;
-  byte audioBuf[32];
+//  byte audioBuf[32];
 };
 Audio audioPack;
 
 byte volatile audioIndex;
 byte volatile displayDone = 1;
+byte volatile fooData = 1;
 byte lastPacketId = 0;
+
+/*
+ *        FUNCTIONS
+ */
 
 void timer1FastPwmAInit(void){
   TCCR1A = _BV(COM1A1) | _BV(WGM11)| _BV(COM1B0) | _BV(COM1B1);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);
-  TIMSK1 |= _BV(TOIE1);
+//  TIMSK1 |= _BV(TOIE1);
   ICR1 = 888;
   DDRB |= _BV(PB1)| _BV(PB2);   // pwm pin as output  D9
   OCR1B = 455;
@@ -62,12 +67,23 @@ void setup() {
 void loop() {
   
   if ( myRadio.available() ) { //&& displayDone
-//    while (myRadio.available()){
+    while (myRadio.available()){
        myRadio.read(&audioPack, sizeof(audioPack));
-//  }
-    Serial.println(audioPack.id);
+    }
+    
     displayDone = 0;
   }
+  Serial.println(audioPack.id);
+  
+  /* works on .write(
+if ( myRadio.available() ) { //&& displayDone
+    while (myRadio.available()){
+          myRadio.read(&fooData, sizeof(fooData));
+    }
+    Serial.println(fooData);
+  }
+*/
+  
 /*
   if(lastPacketId != audioPack.id){
     lastPacketId = audioPack.id;
@@ -86,7 +102,7 @@ void loop() {
 }//end main loop
 
 ISR(TIMER1_OVF_vect){
-  OCR1A = OCR1B = audioPack.audioBuf[audioIndex++];
+//  OCR1A = OCR1B = audioPack.audioBuf[audioIndex++];
   if(audioIndex > 31){
     audioIndex = 0;
     displayDone = 1;

@@ -7,11 +7,12 @@ byte addresses[][6] = {"253"};
 
 struct Audio{
   int id = 1;
-  byte audioBuf[32];
+//  byte audioBuf[32];
 };
 
 Audio audioPack;
 
+byte volatile fooData = 1;
 byte volatile audioIndex;
 byte volatile resetPrint = 1;
 
@@ -31,12 +32,13 @@ void adcAudio(void){
   ADCSRA |= (1 << ADIE);
 }
 
-
-
+/*=========================
+ *        SETUP
+=========================== */
 void setup() {
   pinMode(3, INPUT_PULLUP);
   
-  Serial.begin(1000000);
+  Serial.begin(115200);
   myRadio.begin();  
   myRadio.setChannel(115); 
   myRadio.setPALevel(RF24_PA_LOW);
@@ -46,28 +48,38 @@ void setup() {
   adcAudio();
 
 attachInterrupt(digitalPinToInterrupt(3), reset, FALLING);
-}
+}//end of setup
 
+//enabling next send
 void reset(){
   resetPrint = 1;
 }
 
+
+/*=========================
+ *        LOOP
+=========================== */
 void loop() {
   // put your main code here, to run repeatedly:
 }
 
+/*=========================
+ *       INTERUPTS
+=========================== */
+//getting data and sending it
 ISR(ADC_vect){
 //  byte audioData = ADCH;
-  if(audioIndex<32)
-    audioPack.audioBuf[audioIndex++] = ADCH;
+  if(audioIndex<32);
+//    audioPack.audioBuf[audioIndex++] = ADCH;
     
-  if(audioIndex >31){
+  else{
     ADCSRA &= ~(1 << ADIE);
     
-
     if(resetPrint){
-      myRadio.writeFast(&audioPack, sizeof(audioPack));
-      
+      myRadio.write(&audioPack, sizeof(audioPack));
+       
+
+      /*
       for(int i =0; i <5; i++){
         for(int j =0; j <6; j++){
           Serial.print(audioPack.audioBuf[i* + j]);
@@ -75,6 +87,8 @@ ISR(ADC_vect){
         }
         Serial.println();
       }
+      
+      */
       Serial.println(audioPack.id++);
       resetPrint = 0;
       audioIndex = 0;
