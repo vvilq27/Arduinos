@@ -2,12 +2,14 @@
 #include <RF24.h>
 #include <SPI.h>
 
+#define BUFFER_SIZE 28
+
 RF24 myRadio(7,8);
 byte addresses[][6] = {"253"};
 
 struct Audio{
-  int id = 1;
-//  byte audioBuf[32];
+  byte id = 1;
+  byte audioBuf[BUFFER_SIZE];
 };
 
 Audio audioPack;
@@ -68,27 +70,32 @@ void loop() {
 =========================== */
 //getting data and sending it
 ISR(ADC_vect){
-//  byte audioData = ADCH;
-  if(audioIndex<32);
-//    audioPack.audioBuf[audioIndex++] = ADCH;
-    
+  //fill buffer before sending it
+  if(audioIndex<BUFFER_SIZE)
+    audioPack.audioBuf[audioIndex++] = ADCH;
+  //if buffer full
   else{
     ADCSRA &= ~(1 << ADIE);
     
     if(resetPrint){
-      myRadio.write(&audioPack, sizeof(audioPack));
-       
-
-      /*
+      if(myRadio.write(&audioPack, sizeof(audioPack)))
+        Serial.println("packet sent");
+      else{
+        Serial.println("send error");
+        ADCSRA |= (1 << ADIE);
+        resetPrint = 0;
+        audioIndex = 0;
+        return;
+      }
+      
       for(int i =0; i <5; i++){
-        for(int j =0; j <6; j++){
-          Serial.print(audioPack.audioBuf[i* + j]);
+        for(int j =0; j <5; j++){
+          Serial.print(audioPack.audioBuf[i*5 + j]);
           Serial.print(" ");
         }
         Serial.println();
       }
       
-      */
       Serial.println(audioPack.id++);
       resetPrint = 0;
       audioIndex = 0;

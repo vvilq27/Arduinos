@@ -2,19 +2,20 @@
 #include <RF24.h>
 #include <SPI.h> 
 
+#define BUFFER_SIZE 28
+
 RF24 myRadio(7,8);
 byte addresses[][6] = {"253"};
 
 struct Audio{
-  int id = 0;
-//  byte audioBuf[32];
+  byte id = 1;
+  byte audioBuf[BUFFER_SIZE];
 };
 Audio audioPack;
 
 byte volatile audioIndex;
 byte volatile displayDone = 1;
-byte volatile fooData = 1;
-byte lastPacketId = 0;
+int volatile rcvPacketCnt = 0;
 
 /*
  *        FUNCTIONS
@@ -23,7 +24,7 @@ byte lastPacketId = 0;
 void timer1FastPwmAInit(void){
   TCCR1A = _BV(COM1A1) | _BV(WGM11)| _BV(COM1B0) | _BV(COM1B1);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);
-//  TIMSK1 |= _BV(TOIE1);
+  TIMSK1 |= _BV(TOIE1);
   ICR1 = 888;
   DDRB |= _BV(PB1)| _BV(PB2);   // pwm pin as output  D9
   OCR1B = 455;
@@ -70,10 +71,23 @@ void loop() {
     while (myRadio.available()){
        myRadio.read(&audioPack, sizeof(audioPack));
     }
-    
-    displayDone = 0;
+
+    rcvPacketCnt++;
+//    displayDone = 0;
+Serial.print(audioPack.id);
+Serial.print(" ");
+    Serial.println(audioPack.id-rcvPacketCnt);
+/*
+    for(int i =0; i <5; i++){
+      for(int j =0; j <5; j++){
+        Serial.print(audioPack.audioBuf[i*5 + j]);
+        Serial.print(" ");
+      }
+      Serial.println();
+    }
+ */
   }
-  Serial.println(audioPack.id);
+  
   
   /* works on .write(
 if ( myRadio.available() ) { //&& displayDone
@@ -83,27 +97,12 @@ if ( myRadio.available() ) { //&& displayDone
     Serial.println(fooData);
   }
 */
-  
-/*
-  if(lastPacketId != audioPack.id){
-    lastPacketId = audioPack.id;
 
-    for(int i =0; i <5; i++){
-      for(int j =0; j <6; j++){
-        Serial.print(audioPack.audioBuf[i* + j]);
-        Serial.print(" ");
-      }
-      Serial.println();
-    }//end whole display loop
-
-    Serial.print(audioPack.id);
-  }
-  */
 }//end main loop
 
 ISR(TIMER1_OVF_vect){
-//  OCR1A = OCR1B = audioPack.audioBuf[audioIndex++];
-  if(audioIndex > 31){
+  OCR1A = OCR1B = audioPack.audioBuf[audioIndex++];
+  if(audioIndex > BUFFER_SIZE){
     audioIndex = 0;
     displayDone = 1;
   }
