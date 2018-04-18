@@ -2,7 +2,7 @@
 #include <RF24.h>
 #include <SPI.h>
 
-#define BUFFER_SIZE 60
+#define BUFFER_SIZE 30
 #define LED_PIN 6
 
 RF24 myRadio(7,8);
@@ -35,12 +35,19 @@ void adcAudio(void){
   ADCSRA |= (1 << ADIE);
 }
 
+void T2_init(void){
+  TCCR2B |= (1 << CS22) | (1 << CS21) | (1 << CS20); //1024 presc
+  TIMSK2 |= (1 << TOIE2);
+}
+
 
 /*=========================
  *        SETUP
 =========================== */
 void setup() {
   pinMode(3, INPUT_PULLUP);
+
+  T2_init();
 
   Serial.begin(115200);
   myRadio.begin();  
@@ -51,34 +58,35 @@ void setup() {
   
   adcAudio();
   pinMode(LED_PIN, OUTPUT);
-//attachInterrupt(digitalPinToInterrupt(3), reset, FALLING);
 }//end of setup
-
-/*
-//enabling next send
-void reset(){
-  resetPrint = 1;
-}
-*/
 
 
 /*=========================
  *        LOOP
 =========================== */
 void loop() {
-  // put your main code here, to run repeatedly:
+  /*
   if(!digitalRead(3)){
-    //very jiggy
-    ADCSRA |= (1 << ADIE);
-    digitalWrite(LED_PIN, HIGH);
   }
-  
+  */
 }
 
 /*=========================
  *       INTERUPTS
 =========================== */
 
+ISR(TIMER2_OVF_vect){
+//   Serial.println(ADCH);
+/*
+    for(int i =0; i <5; i++){
+      for(int j =0; j <5; j++){
+        Serial.print(audioPack.audioBuf[i*5 + j]);
+        Serial.print(" ");
+      }
+      Serial.println();
+    }
+    */
+}
 
 //getting data and sending it
 ISR(ADC_vect){
@@ -88,14 +96,10 @@ ISR(ADC_vect){
     audioPack.audioBuf[audioIndex++] = ADCH;
   //if buffer full
   else{
-    ADCSRA &= ~(1 << ADIE);
+//    ADCSRA &= ~(1 << ADIE);
     myRadio.writeFast(&audioPack, sizeof(audioPack));
+    audioIndex = 0;
 /*
-    if(myRadio.write(&audioPack, sizeof(audioPack)))
-      Serial.println("packet sent");
-    else
-      Serial.println("send error");
-
     for(int i =0; i <5; i++){
       for(int j =0; j <5; j++){
         Serial.print(audioPack.audioBuf[i*5 + j]);
@@ -103,15 +107,8 @@ ISR(ADC_vect){
       }
       Serial.println();
     }
-    
-    Serial.println(audioPack.id++);
-    resetPrint = 0;
  */
-    audioIndex = 0;
-    audioPack.id++;
-//    ADCSRA |= (1 << ADIE);
   }
-  digitalWrite(LED_PIN, LOW);
 }
 
 //======== questions ===========

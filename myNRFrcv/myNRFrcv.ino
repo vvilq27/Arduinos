@@ -2,7 +2,7 @@
 #include <RF24.h>
 #include <SPI.h> 
 
-#define BUFFER_SIZE 60
+#define BUFFER_SIZE 30
 #define LED 3
 
 RF24 myRadio(7,8);
@@ -17,7 +17,7 @@ Audio audioPack;
 byte volatile audioIndex;
 byte volatile displayDone = 1;
 int volatile rcvPacketCnt = 0;
-volatile byte vol = 2;
+volatile byte vol = 1;
 
 /*==========================
  *        FUNCTIONS
@@ -27,7 +27,7 @@ void timer1FastPwmAInit(void){
   TCCR1A = _BV(COM1A1) | _BV(WGM11)| _BV(COM1B0) | _BV(COM1B1);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);
   TIMSK1 |= _BV(TOIE1);
-  ICR1 = 390;
+  ICR1 = 420;
   DDRB |= _BV(PB1)| _BV(PB2);   // pwm pin as output  D9
   OCR1B = 123;
 }
@@ -51,7 +51,7 @@ void adcAudio(void){
 
 void T2_init(void){
   TCCR2B |= (1 << CS22) | (1 << CS21) | (1 << CS20); //1024 presc
-//  TIMSK2 |= (1 << TOIE2);
+  TIMSK2 |= (1 << TOIE2);
 }
 
 void adc_init(int channels){
@@ -74,7 +74,7 @@ void setup() {
   timer1FastPwmAInit();
 
   adc_init(3);
-  T2_init();  //int disabled
+  T2_init();  //int 
   
   Serial.begin(115200);
   Serial.println(ICR1);
@@ -99,24 +99,11 @@ void setup() {
 
  //add other buffer, maybe it helpsMM
 void loop() {
-  /*
-  //signal that frames come faster than display ends
-  if(myRadio.available() && !displayDone){
-    digitalWrite(LED, HIGH);
-  }
-  */
-  if ( myRadio.available() && displayDone){
+  if ( myRadio.available() ){
     while (myRadio.available()){
        myRadio.read(&audioPack, sizeof(audioPack));
     }
-    displayDone = 0;
-/*
-    rcvPacketCnt++;
-    
-    Serial.print(audioPack.id);
-    Serial.print(" ");
-    Serial.println(audioPack.id-rcvPacketCnt);
-*/    
+
 /*
     for(int i =0; i <5; i++){
       for(int j =0; j <5; j++){
@@ -126,18 +113,8 @@ void loop() {
       Serial.println();
     }
  */
-    TCCR1A |= _BV(COM1A1)| _BV(COM1B0) | _BV(COM1B1);//turn on speaker
+//    TCCR1A |= _BV(COM1A1)| _BV(COM1B0) | _BV(COM1B1);//turn on speaker
   }//end if
-  
-  
-  /* works on .write(
-if ( myRadio.available() ) { //&& displayDone
-    while (myRadio.available()){
-          myRadio.read(&fooData, sizeof(fooData));
-    }
-    Serial.println(fooData);
-  }
-*/
 
 }//end main loop
 
@@ -147,12 +124,12 @@ if ( myRadio.available() ) { //&& displayDone
 
 
 ISR(TIMER2_OVF_vect){
-   pomiar(0);
-   ICR1 = ADCH * 256;
-   pomiar(1);
-   vol = ADCH / 25;
-   Serial.print(ICR1);
-   Serial.print("  ");
+//   pomiar(0);
+//   ICR1 = ADCH * 256;
+//   pomiar(1);
+//   vol = ADCH / 25;
+//   Serial.print(ICR1);
+//   Serial.print("  ");
    Serial.println(OCR1A);
    
 }
@@ -162,12 +139,11 @@ ISR(TIMER2_OVF_vect){
 //ustawic timer do obslugi jakis funkcjonalnosci(reset diody)
 //stworzyc buffer na 1kb ram i tam ladowac przychodzace dane
 ISR(TIMER1_OVF_vect){
-  if(!displayDone)
-    OCR1A = OCR1B = audioPack.audioBuf[audioIndex++] * vol;
+    OCR1A = OCR1B = audioPack.audioBuf[audioIndex++] * vol + 150;
 
   if(audioIndex > BUFFER_SIZE){
     audioIndex = 0;
-    displayDone = 1;
-    TCCR1A &= ~(_BV(COM1A1) | _BV(COM1B0) | _BV(COM1B1)); //turn off speaker
+//    displayDone = 1;
+//    TCCR1A &= ~(_BV(COM1A1) | _BV(COM1B0) | _BV(COM1B1)); //turn off speaker
   }
 }
