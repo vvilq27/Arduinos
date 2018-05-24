@@ -4,27 +4,28 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <Servo.h>
+//#include <Servo.h> //uses t1 compa
 
 #define ADC_PORT C
 #define PIN_PORT(x) sPIN_PORT(x)
 #define sPIN_PORT(x) (DDR##x)
 
-Servo ESC;
 int sensorPin = A0;    // select the input pin for the potentiometer
-int ledPin = 13;      // select the pin for the LED
 int value = 0;
 
+//int disabled
 void timer2init(void){
   TCCR2B |= (1 << CS22) | (1 << CS21)| (1 << CS20); // presc 256; f = 62khz
-  TIMSK2 |= (1<<TOIE2); // ovf int enable
+//  TIMSK2 |= (1<<TOIE2); // ovf int enable
 }
 
+//COMPA int enabled
 void timer1FastPwmAInit(void){
   TCCR1A = _BV(COM1A1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS11);// | _BV(CS10);
-  ICR1 = 40000;// f=50hz
+  ICR1 = 20000;// f=50hz
   DDRB |= _BV(PB1);   // pwm pin as output  D9
+  TIMSK1 |= (1<<OCIE1A);
 }
 
 void adc_init(int channels){
@@ -43,9 +44,6 @@ inline void pomiar(uint8_t channel){
   while( ADCSRA & (1<<ADSC) ); // wait for meas to complete
 }
 
-
-long val = 0;
-
 //================================
 //             setup
 //================================
@@ -55,29 +53,31 @@ void setup() {
   timer2init();
   timer1FastPwmAInit();
   sei();
- // cli();            // >>>>>>>INTERUPTS DISABLED<<<<<<<<<<<<<
 }
-
 
 //================================
 //           main loop
 //================================
-
-//timers interrupts disabled
 void loop() {
-//  Serial.println(val++);
   
 }
 
+//================================
+//              ISR
+//================================
 ISR(TIMER2_OVF_vect){
-  pomiar(0);
-  OCR1A = 1950 + (ADCH << 3);
-//  Serial.println(ADCH << 3);
-  Serial.println(OCR1A);
+  
+  
+//  Serial.println(OCR1A);
 }
 
+ISR(TIMER1_COMPA_vect)
+{
+  pomiar(0);
+  OCR1A = 2000 + (ADCH << 3);
+}
+
+//not enabled
 ISR(TIMER1_OVF_vect){
   
 }
-
-
