@@ -33,11 +33,12 @@ void setup() {
   pinMode(hall1, OUTPUT);
   pinMode(hall2, OUTPUT);
   pinMode(hall3, OUTPUT);
+  pinMode(12, OUTPUT);
 
   //Clear OC2A on Compare Match, set OC2A at BOTTOM,
 //  TCCR2A |= (1<<COM2A1);
   //pwm mode 3
-//  TCCR2A |= (1<<WGM21) | (1<<WGM20);
+  TCCR2A |= (1<<WGM21) | (1<<WGM20);
   
   TCCR2B |= (1<<CS22)| (1<<CS21) |(1<<CS20); // ; // clkT2S/8 prescale
   TIMSK2 |= (1<<TOIE2); // ovf int enable
@@ -50,9 +51,15 @@ void setup() {
   
   adc_init(0);
   phase = 1;
+
+  currentMillis = micros();
 }
 
 void loop() {
+   currentMillis = micros();
+  if(currentMillis - previousMillis >= Delay){
+    turn_right();   
+  }//end if
 }
 
 void adc_init(int channels){
@@ -70,32 +77,8 @@ inline void meas(uint8_t channel){
   while( ADCSRA & (1<<ADSC) ); // wait for meas to complete
 }
 
-ISR(TIMER2_OVF_vect){
-  meas(0);
-  TCNT2 = ADCH;
-//  if(cnt++ > 0){
-//    switch(phase++){
-//      case 1://    |  |
-//        PORTD = B10100100;
-//        break;
-//      case 2:
-//        PORTD = B01100100;
-//        break;
-//      case 3:
-//        PORTD = B11010000;
-//        break;
-//      case 4:
-//        PORTD = B10110000;      
-//        break;
-//      case 5:
-//        PORTD = B01101000;
-//        break;
-//      case 6:
-//        PORTD = B11001000;
-//        phase = 1;
-//        break;
-//    }//end switch
-    switch(phase++){
+void turn_left(){
+      switch(phase++){
       case 6://    |  |
         PORTD = B10100100;
         phase = 1;
@@ -116,8 +99,38 @@ ISR(TIMER2_OVF_vect){
         PORTD = B11001000;
         break;
     }//end switch
-    cnt =0;  
-//  }//end if
+}
 
-}//end ISR
+void turn_right(){
+  switch(phase++){
+      case 1://    |  |
+        PORTD = B10100100;
+        break;
+      case 2:
+        PORTD = B01100100;
+        break;
+      case 3:
+        PORTD = B11010000;
+        break;
+      case 4:
+        PORTD = B10110000;      
+        break;
+      case 5:
+        PORTD = B01101000;
+        break;
+      case 6:
+        PORTD = B11001000;
+        phase = 1;
+        break;
+    }//end switch  
+}
 
+ISR(TIMER2_OVF_vect){
+  meas(0);
+  OCR2A = ADCH;
+  PORTB &= ~B00010000;
+}
+
+ISR(TIMER2_COMPA_vect){
+  PORTB |= B00010000;
+}
