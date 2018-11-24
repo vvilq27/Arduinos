@@ -40,8 +40,8 @@ void setup() {
   //pwm mode 3
   TCCR2A |= (1<<WGM21) | (1<<WGM20);
   
-  TCCR2B |= (1<<CS22)| (1<<CS21) |(1<<CS20); // ; // clkT2S/8 prescale
-  TIMSK2 |= (1<<TOIE2); // ovf int enable
+  TCCR2B |= (1<<CS20); // (1<<CS22)| (1<<CS21); // clkT2S/8 prescale
+  TIMSK2 |= (1<<TOIE2) | (1<<OCIE2A); // ovf int enable
   
   // OC2RA pin made as output 
   DDRB |= (1<<PB3);
@@ -55,11 +55,11 @@ void setup() {
   currentMillis = micros();
 }
 
+//========================
+//       MAIN LOOP
+//========================
+
 void loop() {
-   currentMillis = micros();
-  if(currentMillis - previousMillis >= Delay){
-    turn_right();   
-  }//end if
 }
 
 void adc_init(int channels){
@@ -126,11 +126,11 @@ void turn_right(){
 }
 
 ISR(TIMER2_OVF_vect){
-  meas(0);
-  OCR2A = ADCH;
-  PORTB &= ~B00010000;
+  turn_right(); 
 }
 
 ISR(TIMER2_COMPA_vect){
-  PORTB |= B00010000;
+  PORTD = 0;
+  meas(0);
+  OCR2A = ADCH;
 }
