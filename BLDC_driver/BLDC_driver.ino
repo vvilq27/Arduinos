@@ -1,5 +1,3 @@
-#include <avr/io.h>
-
 #define ADC_PORT C
 #define PIN_PORT(x) sPIN_PORT(x)
 #define sPIN_PORT(x) (DDR##x)
@@ -16,12 +14,8 @@
 #define hall2 9
 #define hall3 10
 
-uint8_t phase;
-volatile uint8_t duty;
-volatile uint8_t cnt;
-int Delay=4000;
-unsigned long previousMillis = 0; 
-unsigned long currentMillis = 0;
+volatile uint8_t phase;
+volatile uint8_t tim_cnt;
 
 void setup() {
   pinMode(out1, OUTPUT);
@@ -37,22 +31,18 @@ void setup() {
 
   //Clear OC2A on Compare Match, set OC2A at BOTTOM,
 //  TCCR2A |= (1<<COM2A1);
-  //pwm mode 3
+  //fast pwm - mode 3
   TCCR2A |= (1<<WGM21) | (1<<WGM20);
   
-  TCCR2B |= (1<<CS20); // (1<<CS22)| (1<<CS21); // clkT2S/8 prescale
+  TCCR2B |= (1<<CS20) | (1<<CS22);//| (1<<CS21); // clkT2S/8 prescale
   TIMSK2 |= (1<<TOIE2) | (1<<OCIE2A); // ovf int enable
   
-  // OC2RA pin made as output 
-  DDRB |= (1<<PB3);
   OCR2A = 50;
 
   sei();
   
   adc_init(0);
   phase = 1;
-
-  currentMillis = micros();
 }
 
 //========================
@@ -78,7 +68,7 @@ inline void meas(uint8_t channel){
 }
 
 void turn_left(){
-      switch(phase++){
+      switch(phase){
       case 6://    |  |
         PORTD = B10100100;
         phase = 1;
@@ -102,7 +92,7 @@ void turn_left(){
 }
 
 void turn_right(){
-  switch(phase++){
+  switch(phase){
       case 1://    |  |
         PORTD = B10100100;
         break;
@@ -126,11 +116,15 @@ void turn_right(){
 }
 
 ISR(TIMER2_OVF_vect){
-  turn_right(); 
+    turn_right();
+    phase++;
+    PORTB |= (1<<PB4);
+    
 }
 
 ISR(TIMER2_COMPA_vect){
-  PORTD = 0;
-  meas(0);
-  OCR2A = ADCH;
+    PORTD = 0;  
+    meas(0);
+    OCR2A = ADCH;
+    PORTB &= ~(1<<PB4);
 }
