@@ -1,3 +1,5 @@
+//sketch with hall and buttons, no pwm
+
 //driver input pins
 #define out1 2
 #define out2 3
@@ -35,9 +37,9 @@ void setup() {
   motor_stop = false;
 
   Serial.begin(115200);
-//  attachInterrupt(0, turn_off, RISING);
+  
   PCICR |= (1 << PCIE0);
-  PCMSK0 |= (1 < PCINT5) | (1 < PCINT3) | (1 < PCINT4);  //Set pin D10 trigger an interrupt on state change.
+  PCMSK0 |= B00111111;//(1 < PCINT5) | (1 < PCINT3) | (1 < PCINT4);  //Set pin D10 trigger an interrupt on state change.
 //  EICRA = B00000011;  //rising edge
 }
 
@@ -45,6 +47,31 @@ void loop() {
 }
 
 ISR(PCINT0_vect){
+if(  (PINB & B00000101) && phase == 6  ){   
+    phase = 1;    
+  }
+
+  if(  (PINB & B00000100) && phase == 1 ){   
+    phase = 2;    
+  }
+
+  if(  (PINB & B00000110) && phase == 2 ){   
+    phase = 3;    
+  }
+
+  if(  (PINB & B00000010) && phase == 3 ){   
+    phase = 4;    
+  }
+
+  if(  (PINB & B00000011) && phase == 4 ){   
+    phase = 5;    
+  }
+
+  if(  (PINB & B00000001) && phase == 5 ){   
+    phase = 6;    
+  }
+
+  //    MOTOR CONTROL
   //d11
   if(PINB & B00001000){
     Serial.println("ONE"); 
@@ -55,8 +82,7 @@ ISR(PCINT0_vect){
     Serial.println("OTHER");
     motor_direction = false;
   }
-    
-  //if D11 rised
+   //if D11 rised
 //  if(PINB & B00100000)
 //    motor_stop = true;
 //  delay(500);
@@ -121,24 +147,12 @@ void turn_motor(){
 }
 
 ISR(TIMER2_OVF_vect){
-//  if(PINB & B00001000){
-//    motor_stop = true;
-//  }
-//  else{
-//    motor_stop = false;
-//  }
-
   if(motor_stop){
     PORTD = B00000000;
   }else{
-//    if(PINB & B00010000){
-//      turn_the_other_way();
-//    }else{
-//      turn_one_way();
-//    }
     turn_motor();
-    phase++;
-    if(phase == 7)  //cant be in switch case
-       phase = 1;
+//    phase++;
+//    if(phase == 7)  //cant be in switch case
+//       phase = 1;
   }
 }
