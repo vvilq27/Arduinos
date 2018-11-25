@@ -34,7 +34,7 @@ void setup() {
   //fast pwm - mode 3
   TCCR2A |= (1<<WGM21) | (1<<WGM20);
   
-  TCCR2B |= (1<<CS20) | (1<<CS22);//| (1<<CS21); // clkT2S/8 prescale
+  TCCR2B |= (1<<CS20) | (1<<CS22)| (1<<CS21); // clkT2S/8 prescale
   TIMSK2 |= (1<<TOIE2) | (1<<OCIE2A); // ovf int enable
   
   OCR2A = 50;
@@ -43,6 +43,7 @@ void setup() {
   
   adc_init(0);
   phase = 1;
+
 }
 
 //========================
@@ -98,33 +99,59 @@ void turn_right(){
         break;
       case 2:
         PORTD = B01100100;
+        PORTB |= (1<<PB4);
+        PORTB &= ~(1<<PB4);
         break;
       case 3:
         PORTD = B11010000;
         break;
       case 4:
-        PORTD = B10110000;      
+        PORTD = B10110000;
+        PORTB |= (1<<PB4);
+        PORTB &= ~(1<<PB4);
         break;
       case 5:
         PORTD = B01101000;
         break;
       case 6:
         PORTD = B11001000;
-        phase = 1;
+        PORTB |= (1<<PB4);
+        PORTB &= ~(1<<PB4);
         break;
     }//end switch  
 }
 
 ISR(TIMER2_OVF_vect){
     turn_right();
-    phase++;
-    PORTB |= (1<<PB4);
-    
-}
-
-ISR(TIMER2_COMPA_vect){
-    PORTD = 0;  
     meas(0);
     OCR2A = ADCH;
-    PORTB &= ~(1<<PB4);
+    //eliminate "chopping" pwm signal
+    //if pwm more than half, disable first half of pwm signal
+//    if(OCR2A > 127 ){
+//      if(phase == 2 || phase == 4 || phase == 6){
+//        TIMSK2 &= ~(1<<OCIE2A);
+//      }
+//    }else{
+//      TIMSK2 |= (1<<OCIE2A);
+//      if(phase == 1 || phase == 3 || phase == 5)
+//        TIMSK2 &= ~(1<<OCIE2A);
+//    }
+TIMSK2 &= ~(1<<OCIE2A);
+if(OCR2A < 127 ){
+  if(phase == 1 || phase == 3 || phase == 5){
+     TIMSK2 &= ~(1<<OCIE2A);
+     PORTD &= B00000011;
+  }
+}else{
+  if(phase == 2 || phase == 4 || phase == 6){
+     TIMSK2 &= ~(1<<OCIE2A); 
+  }
+}
+    phase++;
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
+
+}
+ISR(TIMER2_COMPA_vect){
+  PORTD &= B00000011;
 }
