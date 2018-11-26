@@ -122,9 +122,23 @@ void turn_right(){
 }
 
 ISR(TIMER2_OVF_vect){
+  if(tim_cnt++ > 60){
+    tim_cnt = 0;
     turn_right();
     meas(0);
     OCR2A = ADCH;
+  }
+    phase++;
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
+
+}
+ISR(TIMER2_COMPA_vect){
+//  PORTD &= B00000011;
+}
+
+//notes 
+//COMENTED BUNCH OF SHIT THAT DOESNT WORK
     //eliminate "chopping" pwm signal
     //if pwm more than half, disable first half of pwm signal
 //    if(OCR2A > 127 ){
@@ -136,26 +150,14 @@ ISR(TIMER2_OVF_vect){
 //      if(phase == 1 || phase == 3 || phase == 5)
 //        TIMSK2 &= ~(1<<OCIE2A);
 //    }
-TIMSK2 &= ~(1<<OCIE2A);
-if(OCR2A < 127 ){
-  if(phase == 1 || phase == 3 || phase == 5){
-     TIMSK2 &= ~(1<<OCIE2A);
-     PORTD &= B00000011;
-  }
-}else{
-  if(phase == 2 || phase == 4 || phase == 6){
-     TIMSK2 &= ~(1<<OCIE2A); 
-  }
-}
-    phase++;
-    if(phase == 7)  //cant be in switch case
-       phase = 1;
-
-}
-ISR(TIMER2_COMPA_vect){
-  PORTD &= B00000011;
-}
-
-//========================
-//       MAIN LOOP
-//========================
+//TIMSK2 &= ~(1<<OCIE2A);
+//if(OCR2A < 127 ){
+//  if(phase == 1 || phase == 3 || phase == 5){
+//     TIMSK2 &= ~(1<<OCIE2A);
+//     PORTD &= B00000011;
+//  }
+//}else{
+//  if(phase == 2 || phase == 4 || phase == 6){
+//     TIMSK2 &= ~(1<<OCIE2A); 
+//  }
+//}
