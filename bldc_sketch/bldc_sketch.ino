@@ -1,4 +1,5 @@
 //sketch with hall and buttons, no pwm
+#define DEBUG 1 
 
 //driver input pins
 #define out1 2
@@ -24,7 +25,9 @@ void setup() {
   pinMode(EN1, OUTPUT);
   pinMode(EN2, OUTPUT);
   pinMode(EN3, OUTPUT);
-  pinMode(10, OUTPUT);
+  pinMode(11, INPUT_PULLUP);
+  pinMode(12, INPUT_PULLUP);
+  pinMode(10, INPUT_PULLUP);
 
 
   //TIM2 setup
@@ -44,10 +47,21 @@ void setup() {
 }
 
 void loop() {
+  if(~PINB & B00000100){
+    if(motor_stop == true){
+      motor_stop = false;
+    }else{
+      motor_stop = true;
+    }
+    while(~PINB & B00000100);
+    delay(300);
+  }
+
 }
 
 ISR(PCINT0_vect){
-if(  (PINB & B00000101) && phase == 6  ){   
+#if DEBUG == 0
+  if(  (PINB & B00000101) && phase == 6  ){   
     phase = 1;    
   }
 
@@ -70,22 +84,29 @@ if(  (PINB & B00000101) && phase == 6  ){
   if(  (PINB & B00000001) && phase == 5 ){   
     phase = 6;    
   }
+#endif
 
   //    MOTOR CONTROL
   //d11
-  if(PINB & B00001000){
-    Serial.println("ONE"); 
+  if(~PINB & B00001000){
     motor_direction = true;
   }
   //d12
-  if(PINB & B00010000){
-    Serial.println("OTHER");
+  if(~PINB & B00010000){
     motor_direction = false;
   }
-   //if D11 rised
-//  if(PINB & B00100000)
-//    motor_stop = true;
-//  delay(500);
+
+  if(~PINB & B00000100){
+  }
+
+//not working
+//  if(~PINB & B00000100){
+//    if(motor_stop == true){
+//      motor_stop = false;
+//    }else{
+//      motor_stop = true;
+//    }
+//  }
 }
 
 //===================
@@ -151,8 +172,12 @@ ISR(TIMER2_OVF_vect){
     PORTD = B00000000;
   }else{
     turn_motor();
-//    phase++;
-//    if(phase == 7)  //cant be in switch case
-//       phase = 1;
+    phase++;
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
   }
+  Serial.print("dir: ");
+  Serial.print(motor_direction);
+  Serial.print("\tmotor stop: ");
+  Serial.println(motor_stop);
 }
