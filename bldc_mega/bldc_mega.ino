@@ -58,6 +58,15 @@ void setup() {
 //       MAIN LOOP
 //========================
 void loop() {
+  if(~PINK & B00100000){
+    if(motor_stop == true){
+      motor_stop = false;
+    }else{
+      motor_stop = true;
+    }
+    while(~PINK & B00100000);
+    delay(300);
+  }
 }
 
 //========================
@@ -144,6 +153,7 @@ ISR(TIMER2_OVF_vect){
       PORTA = B00000000;
       
 #if DEBUG == 1
+    turn_motor();
     Serial.print(motor_direction);
     Serial.print("  ");
     Serial.print(motor_stop);
