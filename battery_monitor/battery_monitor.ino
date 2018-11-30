@@ -11,7 +11,8 @@ void setup() {
   adc_init(0);
   tim2_init();
   Serial.begin(115200);
-  
+
+  pinMode(12, OUTPUT);
 }
 
 void loop() {
@@ -35,23 +36,28 @@ inline void meas(uint8_t channel){
 }
 
 void tim2_init(void){
-  TCCR2B |= (1<<CS20) | (1<<CS21) | (1<<CS22); // clkT2S/8 prescale
+  TCCR2B |=  (1<<CS21) | (1<<CS22); // clkT2S/8 prescale
   TIMSK2 |= (1<<TOIE2); // ovf int enable
 }
 
 ISR(TIMER2_OVF_vect){
-  if(tim_cnt++ > 1){
     meas(0);
     sum100 += ADCH;
     if(sum_cnt++ > 99){
-      avg = (float)sum100/25600;
-      avg *= 4.62;
+      Serial.print(sum100);
+      if(sum100 < 20600)
+        digitalWrite(12, HIGH);
+      else
+        digitalWrite(12, LOW);
+      avg = (float)sum100/255/sum_cnt;
+      avg *= 4.5;
       sum100 = 0;
-      Serial.println(avg);
+      Serial.print("\t");
+      Serial.print(avg );
+      Serial.print("\t");
+      Serial.println(ADCH );
+      
       sum_cnt = 0;
-    }   
-    tim_cnt = 0;
-  }
+    }
 
 }
-
