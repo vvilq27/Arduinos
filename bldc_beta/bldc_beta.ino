@@ -5,10 +5,11 @@
 //AD6 - ENB
 //AD7 - ENAv2
 
-#define DEBUG 0                   //macro used, to disable hall and Serial code part;
-                                  //1 - hall disabled, 0 - hall enabled
-#define SOFT_START_CNT 170
-#define SOFT_START 0
+#define SOFT_START_CNT 70
+#define SOFT_START_CNT2 300
+#define SOFT_START 1
+#define HALL_READ 1
+#define HALL_DRIVE 0
 
 #define ADC_PORT F
 #define PIN_PORT(x) sPIN_PORT(x)  //just more verbose macro, 
@@ -17,16 +18,20 @@
 volatile uint8_t phase;
 volatile bool motor_stop;
 volatile bool motor_direction;
-volatile bool do_once;
+volatile bool do_once;    //makes HALL -> motor_turn -> HALL, 
 
 #if SOFT_START == 1
 volatile bool soft_start;
+volatile bool soft_start_phase2;
 volatile uint16_t soft_start_cnt;
 #endif
 
 //========================
 //         SETUP
 //========================
+
+//Notes
+//speed up timer for SS, if not put SS in loop
 void setup() {
   DDRA |= B11111100;                          //set driver pins as output
 
@@ -36,13 +41,15 @@ void setup() {
   pinMode(A10,INPUT);
   
   //PK3:5 pullup resistor
-  pinMode(A11,INPUT_PULLUP);
-  pinMode(A12,INPUT_PULLUP);
-  pinMode(A13,INPUT_PULLUP);
+  pinMode(A11,INPUT_PULLUP);  //direction
+  pinMode(A12,INPUT_PULLUP);  //direction
+  
+  pinMode(2,INPUT_PULLUP);//MOTOR START
+  pinMode(3,INPUT_PULLUP);//MOTOR STOP
   
   //TIM2 setup
 //  TCCR2A |= (1<<WGM21) | (1<<WGM20);          //tim2 in fast pwm mode
-  TCCR2B |= (1<<CS22)| (1<<CS21); //tim prescaler 1024
+  TCCR2B |= (1<<CS22) | (1<<CS21) | (1<<CS20); //tim prescaler 1024
   TIMSK2 |= (1<<TOIE2) ;//| (1<<OCIE2A);         //tim2 overflow and output compare A interrupt enable
 
   sei();        //global interrupt enable
@@ -58,11 +65,16 @@ void setup() {
 #if SOFT_START == 1
   soft_start = true;
   soft_start_cnt = SOFT_START_CNT;
+  soft_start_phase2 = false;
 #endif
   
-  //EXTI setup, direction change only, pin change mode
-  PCICR |= (1 << PCIE2);      //PCINT16:23 pins enabled
-  PCMSK2 |= B00011000;        //PCINT16:20 pins unmasked
+  //EXTI PCINT setup
+  PCICR |= (1 << PCIE2);      //PCINT16:23 pins enabled    
+  PCMSK2 |= (1<<PCINT19) | (1<<PCINT20);  //PCINT16:20 pins unmasked
+
+//pin 3 stop, pin 2 start
+  EICRB |= (1<<ISC41) | (1<<ISC51); //exti control reg; falling edge
+  EIMSK |= (1<<INT4) | (1<<INT5); //exti mask
 
   Serial.begin(250000);
 }
@@ -71,65 +83,146 @@ void setup() {
 //       MAIN LOOP
 //========================
 void loop() {
-  if(~PINK & B00100000){
-    //resume motor
-    if(motor_stop == true){
-      motor_stop = false;
+
+//dac switcha(pin)
+//    case b101:
+//      i tutaj whila zeby trzymal, wtedy moze nie bedzie sie P i H blokowac
+
+// mozna jeszcze sprobowac zrobic halle na exti
+
+#if HALL_DRIVE == 1
+  if(!soft_start){
+      phase = 1;    
+      do_once = false;
+      turn_motor();
+      Serial.println("H1");
+    //hold while phase1
+    while((PINK & B111) == B100);
+  
+      phase = 2;    
+      Serial.println("H2");
+      do_once = false;
+      turn_motor();
+    while((PINK & B111) == B101);
+  
+      phase = 3;    
+      do_once = false;
+      turn_motor();
+      Serial.println("H3");
+    while((PINK & B111) == B001);
+  
+      phase = 4;    
+      do_once = false;
+      turn_motor();
+      Serial.println("H4");
+    while((PINK & B111) == B011);
+  
+      phase = 5;    
+      do_once = false;
+      turn_motor();
+      Serial.println("H5");
+    while((PINK & B111) == B010);
+  
+      phase = 6;    
+      do_once = false;
+      turn_motor();
+      Serial.println("H6");
+    //hold while phase6
+    while((PINK & B111) == B110);
+  }//soft start
+#endif
+
+#if HALL_READ == 1
+      do_once = false;
+      Serial.println("H1");
+    while((PINK & B111) == B100);
+  
+      Serial.println("H2");
+      do_once = false;
+    while((PINK & B111) == B101);
+  
+      do_once = false;
+      Serial.println("H3");
+    while((PINK & B111) == B001);
+  
+      do_once = false;
+      Serial.println("H4");
+    while((PINK & B111) == B011);
+  
+      do_once = false;
+      Serial.println("H5");
+    while((PINK & B111) == B010);
+  
+      do_once = false;
+      Serial.println("H6");
+    while((PINK & B111) == B110);
+#endif
+}
+
+//========================
+//          ISR
+//========================
+ISR(TIMER2_OVF_vect){
+#if SOFT_START == 1
+  if(soft_start){
+    turn_motor();
+    phase++;        //move to next phase
+  //repeat sequence
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
+    
+    //decrease counter, if 0 disable SS
+    if(!soft_start_cnt-- && soft_start_phase2 == false && soft_start == true){
+      TCCR2B |= (1<<CS22) | (1<<CS21);
+      soft_start_phase2 = true;
+      soft_start_cnt = SOFT_START_CNT2;
+    }
+    if(soft_start_phase2 == true){
+      if(!soft_start_cnt--){
+        soft_start = false;
+        soft_start_phase2 == false;
+        PORTA &= B00000011;
+      }
+    }
+  }
+#endif
+
+  if(motor_stop){
+    PORTA &= B00000011;
+  }
+
+  meas(0);        //get freq
+  TCNT2 = ADCH;   //change timer freq
+}
+
+//  PCINT MOTOR BUTTON CONTROL
+//PK3 turn motor one way
+//PK4 turn motor the other way
+ISR(PCINT2_vect){
+  if(~PINK & (1<<PK3)){
+    motor_direction = true;
+  }
+  if(~PINK & (1<<PK4)){
+    motor_direction = false;
+  }
+}
+
+//  EXTI MOTOR BUTTON CONTROL
+//start
+ISR(INT4_vect){
+  Serial.println("int4 start");
+  motor_stop = false;
 
 #if SOFT_START == 1
     soft_start = true;
     soft_start_cnt = SOFT_START_CNT;
 #endif
+}
 
-    //stop motor  
-    }else{
-      motor_stop = true;
-    }
-    while(~PINK & B00100000);
-    delay(300);
-  }
-
-    phase = 1;    
-    do_once = false;
-    turn_motor();
-    Serial.println("H1");
-  //hold while phase1
-  while((PINK & B111) == B100);
-
-    phase = 2;    
-    Serial.println("H2");
-    do_once = false;
-    turn_motor();
-  //hold while phase2
-  while((PINK & B111) == B101);
-
-    phase = 3;    
-    do_once = false;
-    turn_motor();
-    Serial.println("H3");
-  //hold while phase3
-  while((PINK & B111) == B001);
-
-    phase = 4;    
-    do_once = false;
-    turn_motor();
-    Serial.println("H4");
-  //hold while phase4
-  while((PINK & B111) == B011);
-
-    phase = 5;    
-    do_once = false;
-    turn_motor();
-    Serial.println("H5");
-  //hold while phase5
-  while((PINK & B111) == B010);
-
-    phase = 6;    
-    do_once = false;
-    turn_motor();
-    Serial.println("H6");
-  //hold while phase6
-  while((PINK & B111) == B110);
+//stop
+ISR(INT5_vect){
+  Serial.println("int5 stop");
+  motor_stop = true;
 }
 
 //========================
@@ -210,43 +303,18 @@ void turn_the_other_way(){
 }
 
 void turn_motor(){
-  if(motor_direction)
-    turn_one_way();
-  else
-    turn_the_other_way();
+  if(!motor_stop){
+    if(motor_direction)
+      turn_one_way();
+    else
+      turn_the_other_way();
+    do_once = true;
+  }
 }
 
 //========================
-//          ISR
-//========================
-ISR(TIMER2_OVF_vect){
-  meas(0);        //get freq
-  TCNT2 = ADCH;   //change timer freq
-
-  if(motor_stop){
-    PORTA &= B00000011;
-  }else{
-    if(!do_once){
-//      turn_motor();
-      do_once = true;
-    }
-  }
-    
-#if DEBUG == 1
-  phase++;        //move to next phase
-  //repeat sequence
-  if(phase == 7)  //cant be in switch case
-     phase = 1;
-#endif
-
-#if SOFT_START == 1
-  if(soft_start){
-    if(!soft_start_cnt--){
-      soft_start = false;
-    }
-  }
-#endif
-}
+//      OLDIES
+//=======================
 
 //    ***** ISR DISABLED  *****
 
@@ -255,22 +323,3 @@ ISR(TIMER2_OVF_vect){
 //  PORTA &= B00000011;
 //}
 
-//EXTI port(all pins on port K) layout(first two MSB not used):
-// B 7  6     5        4        3        2        1        0
-//  [ ][ ][       ][PCINT20][PCINT19][       ][       ][       ]
-//
-//PK0:2 HALL sensor inputs
-//PK3 turn motor one way
-//PK4 turn motor the other way
-//
-ISR(PCINT2_vect){
-  //phase change based on HALL readings
-
-//  MOTOR BUTTON CONTROL
-  if(~PINK & (1<<PK3)){
-    motor_direction = true;
-  }
-  if(~PINK & (1<<PK4)){
-    motor_direction = false;
-  }
-}
