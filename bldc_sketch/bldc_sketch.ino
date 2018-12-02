@@ -60,11 +60,9 @@ void setup() {
   
   sei();
     
-//  PCICR |= (1 << PCIE0);
 //                                DISABLED TEST  
    
 //  PCMSK0 |= B00011111;//(1 < PCINT5) | (1 < PCINT3) | (1 < PCINT4);  //Set pin D10 trigger an interrupt on state change.
-  EICRA = B00000001;  //any edge
 }
 
 void loop() {
@@ -137,6 +135,43 @@ void loop() {
   while((PINB & B111) == B101);
 
 }//end loop()
+
+//===================
+//        ISR
+//===================
+
+ISR(TIMER2_OVF_vect){
+  if(motor_stop)
+      PORTD &= B00000011;
+  else{
+//    turn_motor();
+//    phase++;
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
+  }
+      
+  if(soft_start){
+    Serial.println(soft_start_cnt);
+    if(!soft_start_cnt--){
+      soft_start = false;
+    }
+  }
+  meas(0);
+  TCNT2 = ADCH;
+}
+
+ISR(PCINT0_vect){
+  //    MOTOR CONTROL
+  //d11
+//  if(~PINB & (1<<PB3)){
+//    motor_direction = true;
+//  }
+  //d12
+//  if(~PINB & (1<<PB4)){
+//    motor_direction = false;
+//  }
+}
+
 
 //===================
 //    FUNCTIONS
@@ -220,89 +255,4 @@ void turn_motor(){
     turn_one_way();
   else
     turn_the_other_way();
-}
-
-//===================
-//        ISR
-//===================
-
-ISR(TIMER2_OVF_vect){
-  meas(0);
-  TCNT2 = ADCH;
-
-  if(motor_stop)
-      PORTD &= B00000011;
-  else{
-    turn_motor();
-//    phase++;
-    if(phase == 7)  //cant be in switch case
-       phase = 1;
-  }
-      
-  if(soft_start){
-    Serial.println(soft_start_cnt);
-    if(!soft_start_cnt--){
-      PCICR |= (1 << PCIE0);
-      soft_start = false;
-    }
-  }
-}
-
-ISR(PCINT0_vect){
-#if DEBUG == 0
-//  Serial.println(PINB & 7);
-/*
-  if(  (PINB & B00000101) && phase == 6  ){   //&& phase == 6
-    phase = 1;    
-//    Serial.println("H1");
-    digitalWrite(13, HIGH);
-    digitalWrite(13, LOW);
-  }
-
-  if(  (PINB & B00000100) && phase == 1 ){   
-    phase = 2;    
-//    Serial.println("H2");
-    digitalWrite(13, HIGH);
-    digitalWrite(13, LOW);
-  }
-
-  if(  (PINB & B00000110) && phase == 2 ){   
-    phase = 3;    
-//    Serial.println("H3");
-    digitalWrite(13, HIGH);
-    digitalWrite(13, LOW);
-  }
-
-  if(  (PINB & B00000010) && phase == 3 ){   
-    phase = 4;    
-//    Serial.println("H4");
-    digitalWrite(13, HIGH);
-    digitalWrite(13, LOW);
-  }
-
-  if(  (PINB & B00000011)&& phase == 4 ){   
-    phase = 5;    
-//    Serial.println("H5");
-    digitalWrite(13, HIGH);
-    digitalWrite(13, LOW);
-  }
-
-  if(  (PINB & B00000001) && phase == 5){   
-    phase = 6;    
-//    Serial.println("H6");
-    digitalWrite(13, HIGH);
-    digitalWrite(13, LOW);
-  }
-  */
-#endif
-
-  //    MOTOR CONTROL
-  //d11
-//  if(~PINB & (1<<PB3)){
-//    motor_direction = true;
-//  }
-  //d12
-//  if(~PINB & (1<<PB4)){
-//    motor_direction = false;
-//  }
 }

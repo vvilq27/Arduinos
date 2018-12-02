@@ -7,7 +7,7 @@
 
 #define SOFT_START_CNT 60
 #define SOFT_START_CNT2 150
-#define SOFT_START 1
+#define SOFT_START 0
 #define HALL_READ 0
 #define HALL_DRIVE 1
 
@@ -20,11 +20,9 @@ volatile bool motor_stop;
 volatile bool motor_direction;
 volatile bool do_once;    //makes HALL -> motor_turn -> HALL, 
 
-#if SOFT_START == 1
 volatile bool soft_start;
 volatile bool soft_start_phase2;
 volatile uint16_t soft_start_cnt;
-#endif
 
 //========================
 //         SETUP
@@ -62,11 +60,9 @@ void setup() {
   motor_direction = true;
   do_once = false;
 
-#if SOFT_START == 1
   soft_start = true;
   soft_start_cnt = SOFT_START_CNT;
   soft_start_phase2 = false;
-#endif
   
   //EXTI PCINT setup
   PCICR |= (1 << PCIE2);      //PCINT16:23 pins enabled    
