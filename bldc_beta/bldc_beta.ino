@@ -5,11 +5,11 @@
 //AD6 - ENB
 //AD7 - ENAv2
 
-#define SOFT_START_CNT 70
-#define SOFT_START_CNT2 300
+#define SOFT_START_CNT 60
+#define SOFT_START_CNT2 150
 #define SOFT_START 1
-#define HALL_READ 1
-#define HALL_DRIVE 0
+#define HALL_READ 0
+#define HALL_DRIVE 1
 
 #define ADC_PORT F
 #define PIN_PORT(x) sPIN_PORT(x)  //just more verbose macro, 
@@ -171,20 +171,23 @@ ISR(TIMER2_OVF_vect){
     if(phase == 7)  //cant be in switch case
        phase = 1;
     
-    //decrease counter, if 0 disable SS
+    //decrease counter, if 0 enable ss2
     if(!soft_start_cnt-- && soft_start_phase2 == false && soft_start == true){
-      TCCR2B |= (1<<CS22) | (1<<CS21);
+      TCCR2B = (1<<CS22) | (1<<CS21);
       soft_start_phase2 = true;
       soft_start_cnt = SOFT_START_CNT2;
-    }
+      Serial.println("PHASE 2 START");
+    }//ss phase 1
+    
     if(soft_start_phase2 == true){
       if(!soft_start_cnt--){
         soft_start = false;
         soft_start_phase2 == false;
+        Serial.println("PHASE 2 STOP");
         PORTA &= B00000011;
       }
-    }
-  }
+    }//ss phase 2
+  }//if soft start
 #endif
 
   if(motor_stop){
