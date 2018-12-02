@@ -1,16 +1,3 @@
-//AD2 - IN1
-//AD3 - IN3
-//AD4 - IN1v2
-//AD5 - ENA
-//AD6 - ENB
-//AD7 - ENAv2
-
-#define SOFT_START_CNT 60
-#define SOFT_START_CNT2 150
-#define SOFT_START 0
-#define HALL_READ 0
-#define HALL_DRIVE 1
-
 #define ADC_PORT F
 #define PIN_PORT(x) sPIN_PORT(x)  //just more verbose macro, 
 #define sPIN_PORT(x) (DDR##x)     //to set port's pins as either input or output
@@ -19,9 +6,7 @@ volatile uint8_t phase;
 volatile bool motor_stop;
 volatile bool motor_direction;
 
-volatile bool soft_start;
-volatile bool soft_start_phase2;
-volatile uint16_t soft_start_cnt;
+//rusza, timer przyspieszony
 
 //========================
 //         SETUP
@@ -45,23 +30,19 @@ void setup() {
   pinMode(3,INPUT_PULLUP);//MOTOR STOP
   
   //TIM2 setup
-//  TCCR2A |= (1<<WGM21) | (1<<WGM20);          //tim2 in fast pwm mode
-  TCCR2B |= (1<<CS22) | (1<<CS21) | (1<<CS20); //tim prescaler 1024
+  TCCR2B |= (1<<CS22) | (1<<CS21); //tim prescaler 1024
   TIMSK2 |= (1<<TOIE2) ;//| (1<<OCIE2A);         //tim2 overflow and output compare A interrupt enable
 
   sei();        //global interrupt enable
 
   adc_init(0);  //setup adc for pwm
 
+  get_phase();
+
   //motor setup
-  phase = 1;    //set motor initial phase
   motor_stop = true;
   motor_direction = true;
 
-  soft_start = false;
-  soft_start_cnt = SOFT_START_CNT;
-  soft_start_phase2 = false;
-  
   //EXTI PCINT setup
   PCICR |= (1 << PCIE2);      //PCINT16:23 pins enabled    
   PCMSK2 |= (1<<PCINT19) | (1<<PCINT20);  //PCINT16:20 pins unmasked
@@ -71,56 +52,15 @@ void setup() {
   EIMSK |= (1<<INT4) | (1<<INT5); //exti mask
 
   Serial.begin(250000);
+  Serial.print("start phase: ");
+  Serial.println(phase);
+  
 }
 
 //========================
 //       MAIN LOOP
 //========================
 void loop() {
-
-//dac switcha(pin)
-//    case b101:
-//      i tutaj whila zeby trzymal, wtedy moze nie bedzie sie P i H blokowac
-
-// mozna jeszcze sprobowac zrobic halle na exti
-
-#if HALL_DRIVE == 1
-  if(!soft_start){
-      phase = 1;    
-      turn_motor();
-      Serial.println("H1");
-    //hold while phase1
-    while((PINK & B111) == B100);
-  
-      phase = 2;    
-      Serial.println("H2");
-      turn_motor();
-    while((PINK & B111) == B101);
-  
-      phase = 3;    
-      turn_motor();
-      Serial.println("H3");
-    while((PINK & B111) == B001);
-  
-      phase = 4;    
-      turn_motor();
-      Serial.println("H4");
-    while((PINK & B111) == B011);
-  
-      phase = 5;    
-      turn_motor();
-      Serial.println("H5");
-    while((PINK & B111) == B010);
-  
-      phase = 6;    
-      turn_motor();
-      Serial.println("H6");
-    //hold while phase6
-    while((PINK & B111) == B110);
-  }//soft start
-#endif
-
-#if HALL_READ == 1
       Serial.println("H1");
     while((PINK & B111) == B100);
   
@@ -138,40 +78,18 @@ void loop() {
   
       Serial.println("H6");
     while((PINK & B111) == B110);
-#endif
 }
 
 //========================
 //          ISR
 //========================
 ISR(TIMER2_OVF_vect){
-#if SOFT_START == 1
-  if(soft_start){
-    turn_motor();
-    phase++;        //move to next phase
-  //repeat sequence
-    if(phase == 7)  //cant be in switch case
-       phase = 1;
+  turn_motor();
+  phase++;        //move to next phase
+  
+  if(phase == 7)  //cant be in switch case
+     phase = 1;
     
-    //decrease counter, if 0 enable ss2
-    if(!soft_start_cnt-- && soft_start_phase2 == false && soft_start == true){
-      TCCR2B = (1<<CS22) | (1<<CS21);
-      soft_start_phase2 = true;
-      soft_start_cnt = SOFT_START_CNT2;
-      Serial.println("PHASE 2 START");
-    }//ss phase 1
-    
-    if(soft_start_phase2 == true){
-      if(!soft_start_cnt--){
-        soft_start = false;
-        soft_start_phase2 == false;
-        Serial.println("PHASE 2 STOP");
-        PORTA &= B00000011;
-      }
-    }//ss phase 2
-  }//if soft start
-#endif
-
   if(motor_stop){
     PORTA &= B00000011;
   }
@@ -197,11 +115,8 @@ ISR(PCINT2_vect){
 ISR(INT4_vect){
   Serial.println("int4 start");
   motor_stop = false;
-
-#if SOFT_START == 1
-    soft_start = true;
-    soft_start_cnt = SOFT_START_CNT;
-#endif
+  get_phase();
+  
 }
 
 //stop
@@ -296,14 +211,28 @@ void turn_motor(){
   }
 }
 
-//========================
-//      OLDIES
-//=======================
-
-//    ***** ISR DISABLED  *****
-
-//ISR(TIMER2_COMPA_vect){
-//  //disable all outputs to simulate pwm
-//  PORTA &= B00000011;
-//}
+void get_phase(){
+  switch(PINK & B111){
+    case B100:
+      phase = 1;
+      break;
+    case B101:
+      phase = 2;
+      break;
+     case B001:
+      phase = 3;
+      break;
+     case B011:
+      phase = 4;
+      break;
+     case B010:
+      phase = 5;
+      break;
+     case B110:
+      phase = 6;
+      break;      
+  }
+  Serial.print("start phase: ");
+  Serial.println(phase);
+}
 

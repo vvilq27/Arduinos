@@ -96,7 +96,8 @@ void loop() {
   }
 
 //  Serial.println(PINB &B111);
-  
+
+  /*
   //p2
     phase = 2;    
     Serial.println("H2");
@@ -133,7 +134,7 @@ void loop() {
     digitalWrite(13, HIGH);
     digitalWrite(13, LOW);
   while((PINB & B111) == B101);
-
+*/
 }//end loop()
 
 //===================
@@ -141,21 +142,21 @@ void loop() {
 //===================
 
 ISR(TIMER2_OVF_vect){
-  if(motor_stop)
-      PORTD &= B00000011;
-  else{
-//    turn_motor();
-//    phase++;
-    if(phase == 7)  //cant be in switch case
-       phase = 1;
-  }
       
   if(soft_start){
+    turn_motor();
+    phase++;
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
     Serial.println(soft_start_cnt);
     if(!soft_start_cnt--){
       soft_start = false;
     }
   }
+
+  if(motor_stop)
+    PORTD &= B00000011;
+    
   meas(0);
   TCNT2 = ADCH;
 }
@@ -251,8 +252,10 @@ void turn_the_other_way(){
 }
 
 void turn_motor(){
-  if(motor_direction)
-    turn_one_way();
-  else
-    turn_the_other_way();
+  if(!motor_stop){
+    if(motor_direction)
+      turn_one_way();
+    else
+      turn_the_other_way();
+  }
 }
