@@ -2,18 +2,20 @@
 #define PIN_PORT(x) sPIN_PORT(x)  //just more verbose macro, 
 #define sPIN_PORT(x) (DDR##x)     //to set port's pins as either input or output
 
+#define SS_CNT 100
+
 volatile uint8_t phase;
 volatile bool motor_stop;
 volatile bool motor_direction;
-
-//rusza, timer przyspieszony
+volatile uint16_t soft_start_cnt;
+volatile bool soft_start;
 
 //========================
 //         SETUP
 //========================
 
 //Notes
-//speed up timer for SS, if not put SS in loop
+//speed up timer doesnt start motor
 void setup() {
   DDRA |= B11111100;                          //set driver pins as output
 
@@ -29,21 +31,20 @@ void setup() {
   pinMode(2,INPUT_PULLUP);//MOTOR START
   pinMode(3,INPUT_PULLUP);//MOTOR STOP
   
-  //TIM2 setup
-  TCCR2B |= (1<<CS22) | (1<<CS21); //tim prescaler 1024
+  TCCR2B |= (1<<CS22) | (1<<CS21) | (1<<CS20); //tim prescaler 1024
   TIMSK2 |= (1<<TOIE2) ;//| (1<<OCIE2A);         //tim2 overflow and output compare A interrupt enable
 
   sei();        //global interrupt enable
 
   adc_init(0);  //setup adc for pwm
 
+//          VARIABLES
   get_phase();
-
-  //motor setup
   motor_stop = true;
   motor_direction = true;
+  soft_start = true;
+  soft_start_cnt = SS_CNT;
 
-  //EXTI PCINT setup
   PCICR |= (1 << PCIE2);      //PCINT16:23 pins enabled    
   PCMSK2 |= (1<<PCINT19) | (1<<PCINT20);  //PCINT16:20 pins unmasked
 
@@ -52,48 +53,78 @@ void setup() {
   EIMSK |= (1<<INT4) | (1<<INT5); //exti mask
 
   Serial.begin(250000);
+  Serial.println("2209");
   Serial.print("start phase: ");
   Serial.println(phase);
-  
 }
 
 //========================
 //       MAIN LOOP
 //========================
 void loop() {
-      Serial.println("H1");
+  while(soft_start);
+  Serial.println("go"); //delete
+  
+  uint8_t hall = PINK & B111;
+
+  if(hall == B100){
+    phase = 1;    
+    turn_motor();
+    Serial.println("H1");
     while((PINK & B111) == B100);
-  
-      Serial.println("H2");
+  }
+  else if(hall == B101){
+    phase = 2;    
+    Serial.println("H2");
+    turn_motor();
     while((PINK & B111) == B101);
-  
-      Serial.println("H3");
+  }
+  else if(hall == B001){
+    phase = 3;    
+    turn_motor();
+    Serial.println("H3");
     while((PINK & B111) == B001);
-  
-      Serial.println("H4");
+  }
+  else if(hall == B011){
+    phase = 4;    
+    turn_motor();
+    Serial.println("H4");
     while((PINK & B111) == B011);
-  
-      Serial.println("H5");
+  }
+  else if(hall == B010){
+    phase = 5;    
+    turn_motor();
+    Serial.println("H5");
     while((PINK & B111) == B010);
-  
-      Serial.println("H6");
+  }
+  else if(hall == B110){
+    phase = 6;    
+    turn_motor();
+    Serial.println("H6");
     while((PINK & B111) == B110);
+  }
 }
 
 //========================
 //          ISR
 //========================
 ISR(TIMER2_OVF_vect){
-  turn_motor();
-  phase++;        //move to next phase
-  
-  if(phase == 7)  //cant be in switch case
-     phase = 1;
+  if(soft_start_cnt){
+    turn_motor();
+    phase++;        //move to next phase
     
-  if(motor_stop){
-    PORTA &= B00000011;
+    if(phase == 7)  //cant be in switch case
+       phase = 1;
+      
+    if(motor_stop){
+      PORTA &= B00000011;
+    }
+    soft_start_cnt--;
+    Serial.println(soft_start_cnt);
+    if(soft_start_cnt == 0)
+      soft_start = false;
   }
-
+  
   meas(0);        //get freq
   TCNT2 = ADCH;   //change timer freq
 }
@@ -116,7 +147,7 @@ ISR(INT4_vect){
   Serial.println("int4 start");
   motor_stop = false;
   get_phase();
-  
+  soft_start_cnt = SS_CNT;
 }
 
 //stop
@@ -128,7 +159,6 @@ ISR(INT5_vect){
 //========================
 //   CUSTOM FUNCTIONS
 //========================
-//adc setup function
 void adc_init(int channels){
   ADMUX = 0;
   ADMUX |= ( 1<<REFS0 ) | (1<<ADLAR);               //Vref - Vcc, left adjust result
