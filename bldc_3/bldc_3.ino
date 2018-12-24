@@ -44,6 +44,7 @@ void setup() {
   motor_direction = true;
   soft_start = true;
   soft_start_cnt = SS_CNT;
+  unsigned long time;
 
   PCICR |= (1 << PCIE2);      //PCINT16:23 pins enabled    
   PCMSK2 |= (1<<PCINT19) | (1<<PCINT20);  //PCINT16:20 pins unmasked
@@ -53,7 +54,7 @@ void setup() {
   EIMSK |= (1<<INT4) | (1<<INT5); //exti mask
 
   Serial.begin(250000);
-  Serial.println("2209");
+  Serial.println("1207");
   Serial.print("start phase: ");
   Serial.println(phase);
 }
@@ -62,8 +63,11 @@ void setup() {
 //       MAIN LOOP
 //========================
 void loop() {
-  while(soft_start);
-  Serial.println("go"); //delete
+  if(soft_start){
+    Serial.println("SS");
+    while(soft_start);
+  }
+  Serial.println(micros());
   
   uint8_t hall = PINK & B111;
 
@@ -109,7 +113,7 @@ void loop() {
 //          ISR
 //========================
 ISR(TIMER2_OVF_vect){
-  if(soft_start_cnt){
+  if(soft_start_cnt ){  //&& !motor_stop
     turn_motor();
     phase++;        //move to next phase
     
@@ -135,9 +139,11 @@ ISR(TIMER2_OVF_vect){
 ISR(PCINT2_vect){
   if(~PINK & (1<<PK3)){
     motor_direction = true;
+    Serial.println("dir tru");
   }
   if(~PINK & (1<<PK4)){
     motor_direction = false;
+    Serial.println("dir fls");
   }
 }
 
@@ -147,6 +153,7 @@ ISR(INT4_vect){
   Serial.println("int4 start");
   motor_stop = false;
   get_phase();
+  soft_start = true;
   soft_start_cnt = SS_CNT;
 }
 

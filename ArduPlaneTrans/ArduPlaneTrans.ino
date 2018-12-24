@@ -43,7 +43,7 @@ void setup() {
   adc_init(0);
   timer2init();
   sei();
-  
+  Serial.print("start" );
   radio.begin();
   radio.openWritingPipe(pipe);
   radio.setPALevel(RF24_PA_MIN);
@@ -61,7 +61,7 @@ void loop() {
 //without if block, nrf for some reason sends only single packet and stops
 //to make it work faster maybe changing interrupt freq will help
 ISR(TIMER2_OVF_vect){
-  if(intCnt++ < 10)
+  if(intCnt++ < 1)
     return;
   intCnt = 0;
 
