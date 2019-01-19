@@ -9,6 +9,7 @@
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
+
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -23,7 +24,6 @@
 
 Adafruit_SSD1306 display(OLED_RESET);
 RF24 radio(7, 8); // CE, CSN
-const byte address[6] = "00001";
 const uint64_t pipeOut = 0xE8E8F0F0E1LL;
 
 typedef struct{
@@ -36,19 +36,27 @@ typedef struct{
 Bird_msg msg;
 Bird_msg msg_back;
 
+volatile int tim_cnt;
+
 
 void setup() {
   radio_setup();
   oled_setup();
+  timer2init();
   Serial.begin(115200);
+  sei();
 
   adc_init(0);
   adc_init(1);
   adc_init(2);
+
+  tim_cnt = 0;
+  Serial.println("TX start");
 }
 
 unsigned int packetsSent = 0;
 unsigned int packetsAcked = 0;
+unsigned int packetsLost = 0;
 unsigned int latency = 0;
 
 //===========================
@@ -76,39 +84,46 @@ void loop() {
     packetsAcked++;
   }
 
-  radio.write(&msg, sizeof(msg));
+if(tim_cnt == 30){
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.print(latency);
+    display.setCursor(50,0);
+    display.println(msg_back.spd);
+    display.print(packetsLost);
+    display.setCursor(50,10);
+    display.print(msg_back.srv1);
+    display.setCursor(50,20);
+    display.print(msg_back.srv2);
+    display.setCursor(100,0);
+    display.print(packetsSent);
+    display.setCursor(100,10);
+    display.print(packetsAcked);
+    display.display();
+}
 
-  while ( radio.isAckPayloadAvailable()) {
-    radio.read(&msg_back, sizeof(msg_back));
+//
+//  radio.write(&msg, sizeof(msg));
+//
+//  while ( radio.isAckPayloadAvailable()) {
+//    radio.read(&msg_back, sizeof(msg_back));
+//  }
+}
+
+ISR(TIMER2_OVF_vect){
+  if(tim_cnt++ > 30){
+    tim_cnt = 0; 
+
+    packetsLost += packetsSent - packetsAcked;
+    packetsSent = 0;
+    packetsAcked = 0;
   }
-
-  display.setCursor(0,0);
-  display.print(latency);
-  display.setCursor(50,0);
-  display.println(msg_back.spd);
-  display.print(packetsSent-packetsAcked);
-  display.setCursor(50,10);
-  display.println(msg_back.srv1);
-  display.setCursor(50,20);
-  display.println(msg_back.srv2);
-  display.display(); 
-
-//  Serial.print(now);
-//  Serial.print("  ");
-//  Serial.print(latency);
-//  Serial.print("  ");
-//  Serial.print(packetsSent);
-//  Serial.print("  ");
-//  Serial.println(packetsAcked);
-
-  
-  display.clearDisplay();
 }
 
 void radio_setup(){
   radio.begin();
   radio.openWritingPipe(pipeOut);
-  radio.setPALevel(RF24_PA_MIN);
+  radio.setPALevel(RF24_PA_MIN); //RF24_PA_HIGH
   radio.setDataRate(RF24_250KBPS);
   radio.enableAckPayload();
   radio.stopListening();
@@ -143,5 +158,11 @@ inline uint8_t meas(uint8_t channel){
   while( ADCSRA & (1<<ADSC) ); // wait for meas to complete
 
   return ADCH;
+}
+
+void timer2init(void){
+//  TCCR2A |= (1<<WGM21)  |   (1<<WGM20); 
+  TCCR2B |=  (1 << CS22) | (1 << CS21)| (1 << CS20); // presc 1024; f = 16khz (1<<WGM22)  |
+  TIMSK2 |= (1<<TOIE2); // ovf int enable //int f=60hz
 }
 

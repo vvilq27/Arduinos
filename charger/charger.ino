@@ -2,17 +2,15 @@
 #define PIN_PORT(x) sPIN_PORT(x)
 #define sPIN_PORT(x) (DDR##x)
 
+//works
 void setup() {
-  TCCR2A |= (1<<WGM21) | (1<<WGM20) | (1<<COM2A1);          //tim2 in fast pwm mode
-  TCCR2B |= (1<<CS22) ; //tim prescaler 1024 | (1<<CS20)
-  TIMSK2 |= (1<<TOIE2) | (1<<OCIE2A);
-
+  tim2_init();
   pinMode(11, OUTPUT);
   sei();
 
   adc_init(0);
-//  adc_init(1);
-  Serial.begin(1000000);
+  adc_init(1);
+  Serial.begin(115200);
 }
 
 void loop() {
@@ -24,9 +22,9 @@ ISR(TIMER2_OVF_vect){
     meas(0);
     OCR2A = ADCH;
     Serial.println(ADCH);
-//    meas(1);
-//    meas(1);
-//    Serial.println(analogRead(A1));
+    meas(1);
+    meas(1);
+    Serial.println(ADCH);
 }
 
 ISR(TIMER2_COMPA_vect){
@@ -46,5 +44,11 @@ inline void meas(uint8_t channel){
   ADMUX = (ADMUX & 0xF8)|channel;
   ADCSRA |= (1<<ADSC);// measure start
   while( ADCSRA & (1<<ADSC) ); // wait for meas to complete
+}
+
+void tim2_init(){
+  TCCR2A |= (1<<WGM21) | (1<<WGM20) | (1<<COM2A1);          //tim2 in fast pwm mode
+  TCCR2B |= (1<<CS22) | (1<<CS20); //tim prescaler 1024 | (1<<CS20)
+  TIMSK2 |= (1<<TOIE2) | (1<<OCIE2A);
 }
 
