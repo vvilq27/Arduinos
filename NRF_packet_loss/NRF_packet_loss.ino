@@ -44,6 +44,7 @@ void setup() {
   oled_setup();
   timer2init();
   Serial.begin(115200);
+  pinMode(9, OUTPUT);
   sei();
 
   adc_init(0);
@@ -74,10 +75,19 @@ void loop() {
   meas(2);
   meas(2);
   msg.srv2 = meas(2);
-  
-  radio.write(&msg, sizeof(msg));
-  packetsSent++;
 
+  if(digitalRead(9)){
+    msg.spd = 0;
+    radio.write(&msg, sizeof(msg));
+    packetsSent++;
+    delay(1500);
+    Serial.println("stop");
+  }else{
+    radio.write(&msg, sizeof(msg));
+    packetsSent++;
+    Serial.println("luz");
+  }
+  
   while ( radio.isAckPayloadAvailable()) {
     radio.read(&msg_back, sizeof(msg_back));
     latency = millis() - msg_back.timestamp;
@@ -123,7 +133,7 @@ ISR(TIMER2_OVF_vect){
 void radio_setup(){
   radio.begin();
   radio.openWritingPipe(pipeOut);
-  radio.setPALevel(RF24_PA_MIN); //RF24_PA_HIGH
+  radio.setPALevel(RF24_PA_HIGH); //RF24_PA_HIGH
   radio.setDataRate(RF24_250KBPS);
   radio.enableAckPayload();
   radio.stopListening();
@@ -138,9 +148,6 @@ void oled_setup(){
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0,0);
-
-  display.println("hello world");
-  display.display();
 }
 
 void adc_init(int channels){

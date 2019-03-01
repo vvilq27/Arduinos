@@ -10,8 +10,14 @@
 #include <nRF24L01.h>
 #include <RF24.h>
 #include <avr/wdt.h>
+#include <Servo.h>
+
+//#define debug
 
 RF24 radio(7, 8); // CE, CSN
+Servo motor;
+Servo elevator;
+Servo rudder;
 
 const uint64_t pipe = 0xE8E8F0F0E1LL;
 int duty;
@@ -43,6 +49,10 @@ void setup() {
   
   radio.printDetails();
   Serial.println("Receiver start");
+
+  motor.attach(A2);
+  elevator.attach(A1);
+  rudder.attach(A0);
   
   sei();
 //  wdt_enable(WDTO_4S);  //set watchdog to count for 4 sec until restart
@@ -55,6 +65,8 @@ void loop() {
   while(radio.available()) {
     radio.writeAckPayload( 1, &msg, sizeof(msg) );
     radio.read(&msg, sizeof(msg));
+    
+#ifdef debug
     Serial.print(msg.timestamp);
     Serial.print(" ");
     Serial.print(msg.spd);
@@ -62,8 +74,13 @@ void loop() {
     Serial.print(msg.srv1);
     Serial.print(" ");
     Serial.println(msg.srv2);
+#endif
 
-    OCR1A = msg.spd;
+//    OCR1A = msg.spd; test
+    motor.write(map(msg.spd, 0, 255, 60, 180));
+    elevator.write(map(msg.srv1, 0, 255, 0, 180));
+    rudder.write(map(msg.srv2, 0, 255, 0, 180));
+    
     pause = millis();
 
 //    wdt_reset(); // tell watchdog everything is fine, reset WDT timer
