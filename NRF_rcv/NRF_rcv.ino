@@ -43,7 +43,7 @@ void setup() {
   radio.begin();
   radio.setDataRate(RF24_250KBPS);
   radio.openReadingPipe(1,pipe);
-  radio.setPALevel(RF24_PA_MIN);
+  radio.setPALevel(RF24_PA_MAX);
   radio.enableAckPayload();
   radio.startListening();
   
@@ -59,10 +59,11 @@ void setup() {
 //  WDTCSR = (1<<WDIE);
 }
 
-int pause;
+long pause;
 
 void loop() {
-  while(radio.available()) {
+  if(radio.available()) {
+    Serial.println(pause);
     radio.writeAckPayload( 1, &msg, sizeof(msg) );
     radio.read(&msg, sizeof(msg));
     
@@ -86,6 +87,16 @@ void loop() {
 //    wdt_reset(); // tell watchdog everything is fine, reset WDT timer
   }
   //&& !radio.available()
+
+  if((millis() - pause) > 300){
+    //doesnt work
+    motor.write(map(3, 0, 255, 0, 180));
+    elevator.write(map(80, 0, 255, 0, 180));
+    Serial.println("lost");
+    delay(50);
+    while(true);
+//    resetFunc();  
+  }
 }
 
 void timer2init(void){
@@ -94,10 +105,11 @@ void timer2init(void){
   TIMSK2 |= (1<<TOIE2)   ; // ovf int enable //int f=60hz |   (1<<OCIE2A)
 }
 
+//malfunctioning
 void timer1FastPwmAInit(void){
   TCCR1A = _BV(COM1A1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS12) | _BV(CS10);
-  ICR1 = 256;  //sets period
+  ICR1 = 2560;  //sets period
   DDRB |= _BV(PB1);   // pwm pin as output  D9
   OCR1A = 1;    //sets duty
 
@@ -107,12 +119,16 @@ void timer1FastPwmAInit(void){
 //ISR(TIMER2_OVF_vect){
 //}
 
-ISR(TIMER1_OVF_vect){
-  if((millis() - pause) > 400){
-    Serial.println("connection lost");
-    resetFunc();  
-  }
-}
+//not entering timer dunno why
+//ISR(TIMER1_OVF_vect){
+//  Serial.println(millis());
+//  if((millis() - pause) > 400){
+//    Serial.println("lost");
+//    motor.write(0);
+//    elevator.write(45);
+//    resetFunc();  
+//  }
+//}
 
 //enable it, read datasheet
 ISR(WDT_vect){
